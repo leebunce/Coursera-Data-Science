@@ -1,0 +1,59 @@
+---
+title: 'Part 2: Inferential Data Analysis'
+author: "Lee Bunce"
+date: "1 October 2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(ggplot2)
+library(dplyr)
+library(datasets)
+```
+
+In this report we look at the ToothGrowth data in the datasets package. After first performing some exploratory analysis we perform hypothesis tests to compare tooth growth by supplement type and and dose.
+
+# Exploratory Analysis
+
+First we persent some summary statistics for the data, alongside some plots.
+
+```{r, fig.asp=0.618}
+data("ToothGrowth")
+
+summary(ToothGrowth)
+
+ggplot(ToothGrowth, aes(supp, len)) +
+  geom_boxplot() +
+  labs(title = 'Tooth length by supplement type')
+
+ToothGrowth$dose <- as.factor(ToothGrowth$dose)
+
+ggplot(ToothGrowth, aes(dose, len, fill = supp)) +
+  geom_boxplot() +
+  facet_grid(~supp) +
+  labs(title = 'Tooth length by supplement type and dose')
+
+```
+
+# Hypothesis Test
+
+One hypothesis suggested by our exploratory data analysis is that orange juice has a stonger effect on tooth growth than Vitamin C. To test that we perform a test test between the two groups.
+
+```{r}
+t.test(len~supp, data = ToothGrowth)
+```
+
+The test gives a p-value of 0.06, meaning that under a 95% confidence test we fail to reject the null hypothesis that the two groups have the same population mean.
+
+A second suggested hypothesis is that increased dose has a positive impact on tooth length. We again use a t-test to test this hypothesis, focusing on the difference between dosages of 0.5 and 2mg per day.
+
+```{r}
+t.test(len~dose, data = filter(ToothGrowth, dose %in% c(0.5, 2)))
+```
+
+The p-value here us much less than 0.05, so we can reject the null hypothesis that there is no difference between the two groups.
+
+# Assumptions
+
+The conclusions above relies on the assumptions that the sample is representative or the larger population.
