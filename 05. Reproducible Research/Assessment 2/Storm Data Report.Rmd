@@ -1,0 +1,122 @@
+---
+title: "Analysing US Storm Data"
+author: "Lee Bunce"
+date: "23 August 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+
+```
+
+# Synopsis
+
+This document analyses the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
+
+Our analsis looks in patricular at the event types that are responsible for the most fatalities and the greatest economic cost. We find that tornado have been responsible for the most fatalities, while floods have been responsible for the most economic damage.
+
+# Data Processing
+
+First we download the data and read it into R.
+
+```{r}
+
+if(!file.exists("Data/StormData.csv.bz2")){
+  download.file('https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2', destfile = 'Data/StormData.csv.bz2')
+}
+
+if(!exists('StormData')){
+  storm_data <- read_csv("Data/StormData.csv.bz2")
+}
+
+```
+
+The next task is prepare the data for tha analyis, where we focus on the fields relating to the economic impact of storms. The 'PROPDMG' and 'PROPDMGEXP' fields together give vale of the damage each event had on property. The first of these fields gives the value and the second gives the scales (thousnads, millions etc.). The 'CROPDMG' and 'CROPDMGEXP' fields similarly describe the value of damage to crops.
+
+The first task then is to create new 'clean' fields that give the cost as a single numeric value so that we can use these fields for onward analysis. We do this by first converting the character value in the PROPDMGEXP and CROPDMGEXP fields into the equivalent numeric values (e.g. 'M' is million, so 1000000). We then multiply these new numeric values by the PROPDMG and CROPDMG fields to give the numeric representation of the damage.
+
+We then sum these new fields to give a total economic cost.
+
+```{r}
+
+storm_data_clean <- storm_data %>% 
+  mutate(PROPDMGEXP_clean = case_when(is.na(PROPDMGEXP) ~ 0,
+                                PROPDMGEXP == 'K' ~ 1000,
+                                PROPDMGEXP == 'M' ~ 1000000,
+                                PROPDMGEXP == 'B' ~ 1000000000,
+                                PROPDMGEXP == 'm' ~ 1000000,
+                                PROPDMGEXP == '+' ~ 1,
+                                PROPDMGEXP == '?' ~ 0,
+                                PROPDMGEXP == 'h' ~ 100,
+                                PROPDMGEXP == 'H' ~ 100,
+                                PROPDMGEXP == '-' ~ -1,
+                                PROPDMGEXP %in% as.character(0:9) ~ as.numeric(10^as.integer(PROPDMGEXP))
+                                ),
+         CROPDMGEXP_clean = case_when(is.na(CROPDMGEXP) ~ 0,
+                                CROPDMGEXP == 'K' ~ 1000,
+                                CROPDMGEXP == 'M' ~ 1000000,
+                                CROPDMGEXP == 'B' ~ 1000000000,
+                                CROPDMGEXP == 'm' ~ 1000000,
+                                CROPDMGEXP == '+' ~ 1,
+                                CROPDMGEXP == '?' ~ 0,
+                                CROPDMGEXP == 'h' ~ 100,
+                                CROPDMGEXP == 'H' ~ 100,
+                                CROPDMGEXP == '-' ~ -1,
+                                CROPDMGEXP %in% as.character(0:9) ~ as.numeric(10^as.integer(CROPDMGEXP))
+                                ),
+         PROPDMG_clean = PROPDMG*PROPDMGEXP_clean,
+         CROPDMG_clean = CROPDMG*CROPDMGEXP_clean,
+         total_damage = PROPDMG_clean + CROPDMG_clean)
+
+```
+
+# Results
+
+In this section we present the results of our analysis. In particular we look first at the event type that has produced the greatest number of fatalities. Secondly we then look at the even type that has had the greatest economic impact.
+
+## Fatalities
+
+Here we calculate the total number of fatalities for each event type, and present the 10 greatest values in the bar chart below. The chart shows that tornados have been responsible for the most fatalities by some margin, followed by excessive heat and flash floods.
+
+```{r}
+
+fatalities <- storm_data_clean %>% 
+  group_by(EVTYPE) %>% 
+  summarise('Total fatalities' = sum(FATALITIES, na.rm=T)) %>% 
+  arrange(-`Total fatalities`) %>% 
+  head(10)
+
+ggplot(fatalities, aes(reorder(EVTYPE, `Total fatalities`),`Total fatalities`)) +
+  geom_bar(stat = 'identity') +
+  labs(title = 'Total fatalities by event type',
+       x = 'Event type',
+       y = 'Total fatalities') +
+  coord_flip()
+
+```
+
+## Economic cost
+
+Here we similarly calculte the total economic damage caused by each event type and present the figures for the top 10 values in the chart below.
+
+The chart shows that floods have been responsible for the most economic damage, rather than tornados.
+
+```{r}
+economic <- storm_data_clean %>% 
+  group_by(EVTYPE) %>% 
+  summarise(Total = sum(total_damage, na.rm = T)) %>% 
+  arrange(-Total) %>% 
+  head(10)
+
+ggplot(economic, aes(reorder(EVTYPE, Total), Total)) +
+  geom_bar(stat = 'identity') +
+  labs(title = 'Total economic cost by event type',
+       x = 'Evet type',
+       y = 'Total cost ($)') +
+  coord_flip()
+  
+```
+
